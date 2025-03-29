@@ -1,0 +1,44 @@
+﻿version: '3.8'
+services:
+
+#------------------------ mysql database---------------------------
+  mysql:
+    image: mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: qwerty
+    ports:
+      - "3306:3306"
+    volumes:
+      - '~/Documents/Dev/MySQL:/var/lib/mysql'
+      - ./schema.sql:/schema.sql
+
+#------------------------ Temp mysql database (just for running schema.sql file script)---------------------------      
+  init-schema:
+    image: mysql:8  
+    depends_on:
+      - mysql
+    entrypoint: >
+      sh -c "until mysqladmin ping -h mysql -u root -p'qwerty' --silent; do sleep 2; done &&
+             mysql -h mysql -u root -p'qwerty' < /schema.sql"
+    volumes:
+      - ./schema.sql:/schema.sql
+    restart: "no"
+
+#------------------------ Cibus Server ---------------------------    
+  cibus:
+    container_name: cibus
+    build:
+      context: .
+      dockerfile: Dockerfile  
+    environment:
+      - NODE_ENV=production
+      - PORT=80
+      - DB_CONNECTION_STRING=server=host.docker.internal;Port=3306;user=root;password=qwerty;database=CibusDb
+      - HOST=host.docker.internal
+    restart: unless-stopped
+    ports:
+      - 80:80
+      - 3000:3000
+    depends_on:
+      - mysql
